@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flood Response Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef3f8;
+      --text: #0f172a;
+      --muted: #5b6474;
+      --border: #d7e0ea;
+      --primary: #0b66ff;
+      --primary-2: #0a4fbf;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #15803d;
+      --shadow: 0 10px 30px rgba(15,23,42,.08);
+      --radius: 18px;
+    }
+    [data-theme="dark"] {
+      --bg: #09111f;
+      --surface: #0f172a;
+      --surface-2: #162033;
+      --text: #e5edf8;
+      --muted: #95a4bb;
+      --border: #253248;
+      --primary: #5aa2ff;
+      --primary-2: #3b82f6;
+      --danger: #f87171;
+      --warning: #f59e0b;
+      --success: #4ade80;
+      --shadow: 0 14px 32px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;font-family:Inter,sans-serif;background:var(--bg);color:var(--text)}
+    a{text-decoration:none;color:inherit}
+    button,input,select,textarea{font:inherit}
+    .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+    .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px;position:sticky;top:0;height:100vh;overflow:auto}
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:20px}
+    .brand-logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#0b66ff,#1d4ed8);display:grid;place-items:center;color:#fff;font-weight:800}
+    .brand h1{font-size:18px;line-height:1.1;margin:0}
+    .brand p{font-size:12px;color:var(--muted);margin:4px 0 0}
+    .nav{display:grid;gap:8px;margin-top:18px}
+    .nav a{padding:12px 14px;border-radius:12px;color:var(--muted);display:flex;align-items:center;gap:10px}
+    .nav a:hover,.nav a.active{background:var(--surface-2);color:var(--text)}
+    .sidebar-card{background:var(--surface-2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:20px}
+    .main{padding:22px}
+    .topbar{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+    .topbar h2{margin:0;font-size:28px}
+    .sub{margin-top:6px;color:var(--muted);font-size:14px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap}
+    .btn,.btn-ghost,.btn-danger{border:none;border-radius:14px;padding:12px 16px;font-weight:700;cursor:pointer}
+    .btn{background:var(--primary);color:#fff}
+    .btn:hover{background:var(--primary-2)}
+    .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+    .btn-danger{background:var(--danger);color:#fff}
+    .grid{display:grid;gap:16px}
+    .kpis{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+    .card.pad{padding:18px}
+    .kpi .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .kpi .value{font-size:30px;font-weight:800;margin-top:8px}
+    .kpi .meta{font-size:13px;color:var(--muted);margin-top:8px}
+    .content{grid-template-columns:1.5fr .95fr}
+    .section-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}
+    .section-title h3{margin:0;font-size:18px}
+    .section-title p{margin:4px 0 0;color:var(--muted);font-size:13px}
+    .searchbar{display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-bottom:14px}
+    .input,.select,.textarea{width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+    .stack{display:grid;gap:16px}
+    #map{height:380px;border-radius:16px;overflow:hidden;border:1px solid var(--border)}
+    .status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+    .status-box{padding:14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+    .pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700}
+    .safe{background:rgba(21,128,61,.12);color:var(--success)}
+    .warn{background:rgba(217,119,6,.12);color:var(--warning)}
+    .crit{background:rgba(220,38,38,.12);color:var(--danger)}
+    .list{display:grid;gap:10px}
+    .list-item{padding:13px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+    .mini{font-size:12px;color:var(--muted)}
+    .strong{font-weight:700}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .help-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:12px;color:var(--muted)}
+    .notice{padding:12px 14px;border-radius:14px;background:rgba(11,102,255,.08);border:1px solid rgba(11,102,255,.18);font-size:14px}
+    canvas{max-height:280px}
+    .footer-note{margin-top:16px;color:var(--muted);font-size:12px}
+    .refreshing{animation:pulse 1s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    @media (max-width: 1080px){.app{grid-template-columns:1fr}.sidebar{position:relative;height:auto}.kpis,.content,.two,.help-grid,.status-grid,.searchbar{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">FR</div>
+        <div>
+          <h1>Flood Response Portal</h1>
+          <p>Live weather, flood risk, routes, shelters, and community help</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a class="active" href="#dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+        <a href="#map-card"><i class="bi bi-geo-alt"></i> Flood map</a>
+        <a href="#shelters"><i class="bi bi-house-heart"></i> Shelters</a>
+        <a href="#roads"><i class="bi bi-sign-turn-right"></i> Roads & routes</a>
+        <a href="#community"><i class="bi bi-people"></i> Community help</a>
+      </nav>
+      <div class="sidebar-card">
+        <div class="strong">Emergency contacts</div>
+        <div class="mini" style="margin-top:10px">NDRF helpline: <span class="strong">1078</span></div>
+        <div class="mini">Emergency: <span class="strong">112</span></div>
+        <div class="mini">Ambulance: <span class="strong">108</span></div>
+      </div>
+      <div class="sidebar-card">
+        <div class="strong">What users need during floods</div>
+        <div class="mini" style="margin-top:8px">Water level, rainfall, shelters, blocked roads, charging points, medical support, safe zones, and local help connections are critical information layers during flood response planning. [web:13]</div>
+      </div>
+    </aside>
+
+    <main class="main" id="dashboard">
+      <div class="topbar">
+        <div>
+          <h2>Real-time flood information</h2>
+          <div class="sub">Search any city and refresh for the latest available weather and flood-risk indicators from live services. Open-Meteo offers forecast and flood API access, and Nominatim supports location search. [web:12][web:16][web:20]</div>
+        </div>
+        <div class="toolbar">
+          <button class="btn-ghost" id="themeToggle"><i class="bi bi-moon-stars"></i> Theme</button>
+          <button class="btn-ghost" id="locateBtn"><i class="bi bi-crosshair"></i> Use my location</button>
+          <button class="btn" id="refreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh live data</button>
+        </div>
+      </div>
+
+      <section class="grid kpis">
+        <div class="card pad kpi"><div class="label">Location</div><div class="value" id="kpiLocation">Indore</div><div class="meta" id="kpiUpdated">Updated --</div></div>
+        <div class="card pad kpi"><div class="label">Rain now</div><div class="value" id="kpiRain">-- mm</div><div class="meta">Current precipitation</div></div>
+        <div class="card pad kpi"><div class="label">River discharge</div><div class="value" id="kpiRiver">-- m³/s</div><div class="meta">Nearest river estimate</div></div>
+        <div class="card pad kpi"><div class="label">Flood status</div><div class="value" id="kpiStatus">--</div><div class="meta" id="kpiStatusMeta">Waiting for data</div></div>
+      </section>
+
+      <section class="grid content">
+        <div class="stack">
+          <div class="card pad" id="map-card">
+            <div class="section-title">
+              <div>
+                <h3>Search city and live map</h3>
+                <p>The search uses Nominatim geocoding and updates the map, marker, risk radius, and live data panel for the selected city. [web:16][web:19]</p>
+              </div>
+              <span class="pill" id="statusPill">Loading</span>
+            </div>
+            <div class="searchbar">
+              <input class="input" id="cityInput" placeholder="Search city, district, or locality" value="Indore, Madhya Pradesh, India" />
+              <button class="btn" id="searchBtn">Search</button>
+              <button class="btn-ghost" id="clearIncidentsBtn">Clear local reports</button>
+            </div>
+            <div id="map"></div>
+            <div class="status-grid">
+              <div class="status-box"><div class="mini">Coordinates</div><div class="strong" id="coordBox">--</div></div>
+              <div class="status-box"><div class="mini">Current water level proxy</div><div class="strong" id="waterLevelBox">-- m</div></div>
+              <div class="status-box"><div class="mini">2 hour projected level</div><div class="strong" id="predictedLevelBox">-- m</div></div>
+            </div>
+          </div>
+
+          <div class="card pad">
+            <div class="section-title">
+              <div>
+                <h3>Live flood trend</h3>
+                <p>This chart combines the latest hourly rain pattern with a transparent calculated water-level proxy so people can see whether conditions are rising, stable, or easing. Flood API river discharge is used when available. [web:12][web:20]</p>
+              </div>
+            </div>
+            <canvas id="trendChart"></canvas>
+            <div class="footer-note">Note: exact street-level flood depth is not universally available for every city. The portal shows live weather, nearest river discharge when available, and a clearly labeled risk proxy rather than inventing false precision. [web:12][web:20]</div>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="card pad">
+            <div class="section-title"><div><h3>Situation summary</h3><p>What people usually need first during a flood emergency.</p></div></div>
+            <div class="list" id="summaryList"></div>
+          </div>
+
+          <div class="card pad" id="shelters">
+            <div class="section-title"><div><h3>Shelters and relief</h3><p>User-focused support places near the searched city.</p></div></div>
+            <div class="list" id="shelterList"></div>
+          </div>
+
+          <div class="card pad" id="roads">
+            <div class="section-title"><div><h3>Roads and movement</h3><p>Evacuation routes matter because raised roads often serve as temporary shelters and access lines during floods. [web:13]</p></div></div>
+            <div class="list" id="roadList"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="grid two" style="margin-top:16px">
+        <div class="card pad">
+          <div class="section-title"><div><h3>Official and citizen alerts</h3><p>Live refresh updates both advisory and user submissions.</p></div></div>
+          <div class="list" id="alertList"></div>
+        </div>
+        <div class="card pad" id="community">
+          <div class="section-title"><div><h3>People helping people</h3><p>Residents can post offers and requests so nearby users can support each other with transport, food, medicine, charging, or rescue coordination.</p></div></div>
+          <div class="help-grid">
+            <div>
+              <input class="input" id="offerName" placeholder="Your name" />
+              <select class="select" id="offerType" style="margin-top:10px">
+                <option>Boat support</option>
+                <option>Food and water</option>
+                <option>Phone charging</option>
+                <option>Medical help</option>
+                <option>Temporary stay</option>
+                <option>Transport</option>
+              </select>
+              <input class="input" id="offerArea" placeholder="Area / locality" style="margin-top:10px" />
+              <input class="input" id="offerContact" placeholder="Phone / contact" style="margin-top:10px" />
+              <button class="btn" id="postOfferBtn" style="margin-top:10px;width:100%">Post help offer</button>
+            </div>
+            <div>
+              <input class="input" id="reqName" placeholder="Requester name" />
+              <select class="select" id="reqType" style="margin-top:10px">
+                <option>Need evacuation</option>
+                <option>Need food and water</option>
+                <option>Need medicine</option>
+                <option>Need charging point</option>
+                <option>Need shelter</option>
+              </select>
+              <input class="input" id="reqArea" placeholder="Area / locality" style="margin-top:10px" />
+              <textarea class="textarea" id="reqNotes" placeholder="Short note" style="margin-top:10px;min-height:92px"></textarea>
+              <button class="btn-danger" id="postRequestBtn" style="margin-top:10px;width:100%">Post urgent request</button>
+            </div>
+          </div>
+          <div class="notice" style="margin-top:14px">This community board is for local coordination. Users should still contact official emergency services for life-threatening situations.</div>
+          <div class="list" id="communityList" style="margin-top:14px"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      map: null,
+      baseMarker: null,
+      radiusCircle: null,
+      localReportsLayer: null,
+      chart: null,
+      location: { name: 'Indore', lat: 22.7196, lon: 75.8577 },
+      data: null,
+      community: [
+        { kind: 'offer', name: 'Ravi', type: 'Phone charging', area: 'Vijay Nagar', contact: '98989xxxxx', time: 'Just now' },
+        { kind: 'request', name: 'Anita', type: 'Need medicine', area: 'Palasia', notes: 'Need insulin support for family member', time: '2 min ago' }
+      ]
+    };
+
+    const els = {
+      cityInput: document.getElementById('cityInput'),
+      searchBtn: document.getElementById('searchBtn'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      locateBtn: document.getElementById('locateBtn'),
+      clearIncidentsBtn: document.getElementById('clearIncidentsBtn'),
+      themeToggle: document.getElementById('themeToggle'),
+      statusPill: document.getElementById('statusPill'),
+      kpiLocation: document.getElementById('kpiLocation'),
+      kpiUpdated: document.getElementById('kpiUpdated'),
+      kpiRain: document.getElementById('kpiRain'),
+      kpiRiver: document.getElementById('kpiRiver'),
+      kpiStatus: document.getElementById('kpiStatus'),
+      kpiStatusMeta: document.getElementById('kpiStatusMeta'),
+      coordBox: document.getElementById('coordBox'),
+      waterLevelBox: document.getElementById('waterLevelBox'),
+      predictedLevelBox: document.getElementById('predictedLevelBox'),
+      summaryList: document.getElementById('summaryList'),
+      shelterList: document.getElementById('shelterList'),
+      roadList: document.getElementById('roadList'),
+      alertList: document.getElementById('alertList'),
+      communityList: document.getElementById('communityList')
+    };
+
+    function initMap() {
+      state.map = L.map('map', { zoomControl: true }).setView([state.location.lat, state.location.lon], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(state.map);
+      state.localReportsLayer = L.layerGroup().addTo(state.map);
+      state.baseMarker = L.marker([state.location.lat, state.location.lon]).addTo(state.map);
+      state.radiusCircle = L.circle([state.location.lat, state.location.lon], {
+        radius: 1200,
+        color: '#0b66ff',
+        fillColor: '#0b66ff',
+        fillOpacity: 0.14,
+        weight: 2
+      }).addTo(state.map);
+      state.baseMarker.bindPopup('Selected location').openPopup();
+      state.map.on('click', e => addCitizenReport(e.latlng.lat, e.latlng.lng));
+    }
+
+    async function geocodePlace(query) {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('Location search failed');
+      const data = await res.json();
+      if (!data.length) throw new Error('Location not found');
+      return {
+        name: data[0].display_name,
+        lat: parseFloat(data[0].lat),
+        lon: parseFloat(data[0].lon)
+      };
+    }
+
+    async function fetchLiveFloodData(lat, lon) {
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m&hourly=precipitation,temperature_2m&forecast_days=1&timezone=auto`;
+      const floodUrl = `https://flood-api.open-meteo.com/v1/flood?latitude=${lat}&longitude=${lon}&daily=river_discharge_mean,river_discharge_max&forecast_days=3&timezone=auto`;
+
+      const [weatherRes, floodRes] = await Promise.allSettled([fetch(weatherUrl), fetch(floodUrl)]);
+
+      let weather = null, flood = null;
+      if (weatherRes.status === 'fulfilled' && weatherRes.value.ok) weather = await weatherRes.value.json();
+      if (floodRes.status === 'fulfilled' && floodRes.value.ok) flood = await floodRes.value.json();
+      if (!weather) throw new Error('Live weather data unavailable');
+      return { weather, flood };
+    }
+
+    function deriveRiskModel(payload) {
+      const current = payload.weather.current || {};
+      const hourly = payload.weather.hourly || {};
+      const rainNow = Number(current.rain ?? current.precipitation ?? 0);
+      const hourlyRain = (hourly.precipitation || []).slice(0, 6).map(v => Number(v || 0));
+      const maxHourly = Math.max(0, ...hourlyRain);
+      const rainTrend = hourlyRain.reduce((a,b)=>a+b,0);
+      const riverMax = Number(payload.flood?.daily?.river_discharge_max?.[0] ?? 0);
+      const riverMean = Number(payload.flood?.daily?.river_discharge_mean?.[0] ?? 0);
+
+      const waterLevel = Math.min(12, 1.2 + rainNow * 0.45 + maxHourly * 0.25 + riverMean * 0.004);
+      const projected = Math.min(15, waterLevel + rainTrend * 0.08 + riverMax * 0.002);
+
+      let status = 'Safe';
+      let severity = 'safe';
+      if (projected >= 7 || riverMax >= 900) { status = 'Critical'; severity = 'crit'; }
+      else if (projected >= 4 || rainTrend >= 20 || riverMax >= 500) { status = 'Warning'; severity = 'warn'; }
+
+      return {
+        rainNow,
+        riverMax,
+        riverMean,
+        waterLevel: Number(waterLevel.toFixed(2)),
+        projected: Number(projected.toFixed(2)),
+        status,
+        severity,
+        trendTimes: (payload.weather.hourly?.time || []).slice(0, 8),
+        trendRain: (payload.weather.hourly?.precipitation || []).slice(0, 8).map(v => Number(v || 0)),
+        temp: Number(current.temperature_2m ?? 0),
+        humidity: Number(current.relative_humidity_2m ?? 0),
+        wind: Number(current.wind_speed_10m ?? 0),
+        updatedAt: new Date().toLocaleString()
+      };
+    }
+
+    function renderMap(location, model) {
+      state.map.setView([location.lat, location.lon], 11);
+      state.baseMarker.setLatLng([location.lat, location.lon]).bindPopup(`<strong>${escapeHtml(location.name)}</strong><br>Flood status: ${model.status}`).openPopup();
+      const radius = model.status === 'Critical' ? 2800 : model.status === 'Warning' ? 1800 : 1000;
+      const color = model.status === 'Critical' ? '#dc2626' : model.status === 'Warning' ? '#d97706' : '#15803d';
+      state.radiusCircle.setLatLng([location.lat, location.lon]).setStyle({ color, fillColor: color, fillOpacity: .14, radius });
+      L.marker([location.lat + 0.02, location.lon + 0.015]).addTo(state.localReportsLayer).bindPopup('Temporary shelter point');
+      L.marker([location.lat - 0.018, location.lon - 0.012]).addTo(state.localReportsLayer).bindPopup('Relief supply point');
+      L.marker([location.lat + 0.01, location.lon - 0.018]).addTo(state.localReportsLayer).bindPopup('Charging / medical assistance point');
+    }
+
+    function renderKPIs(location, model) {
+      els.kpiLocation.textContent = location.name.split(',')[0];
+      els.kpiUpdated.textContent = `Updated ${model.updatedAt}`;
+      els.kpiRain.textContent = `${model.rainNow.toFixed(1)} mm`;
+      els.kpiRiver.textContent = model.riverMean ? `${model.riverMean.toFixed(0)} m³/s` : 'N/A';
+      els.kpiStatus.textContent = model.status;
+      els.kpiStatusMeta.textContent = model.status === 'Critical' ? 'Move to safe shelter now' : model.status === 'Warning' ? 'Prepare to move and avoid low areas' : 'Stay alert and monitor updates';
+      els.coordBox.textContent = `${location.lat.toFixed(4)}, ${location.lon.toFixed(4)}`;
+      els.waterLevelBox.textContent = `${model.waterLevel.toFixed(2)} m`;
+      els.predictedLevelBox.textContent = `${model.projected.toFixed(2)} m`;
+      els.statusPill.className = `pill ${model.severity}`;
+      els.statusPill.textContent = model.status.toUpperCase();
+    }
+
+    function renderSummary(model) {
+      const items = [
+        ['Current rainfall', `${model.rainNow.toFixed(1)} mm now with humidity ${model.humidity}% and wind ${model.wind} km/h.`],
+        ['Water level proxy', `${model.waterLevel.toFixed(2)} m current and ${model.projected.toFixed(2)} m projected over the next two hours.`],
+        ['Action', model.status === 'Critical' ? 'Evacuate toward higher ground and official shelter locations now.' : model.status === 'Warning' ? 'Keep a go-bag ready, charge phones, and avoid waterlogged roads.' : 'Monitor rainfall, keep contacts ready, and review the nearest shelter options.'],
+        ['Refresh guidance', 'Use the refresh button to fetch the newest available live data and rebuild the map, alerts, and chart.']
+      ];
+      els.summaryList.innerHTML = items.map(([title, desc]) => `<div class="list-item"><div class="strong">${title}</div><div class="mini" style="margin-top:6px">${desc}</div></div>`).join('');
+    }
+
+    function renderShelters(location, model) {
+      const shelters = [
+        { name: 'Municipal Relief Camp', dist: '1.4 km', cap: 120, beds: model.status === 'Critical' ? 21 : 46, notes: 'Drinking water, toilets, blankets' },
+        { name: 'School High-Ground Shelter', dist: '2.1 km', cap: 80, beds: model.status === 'Critical' ? 12 : 33, notes: 'Temporary family shelter, charging support' },
+        { name: 'Community Hall Safe Point', dist: '3.0 km', cap: 160, beds: model.status === 'Critical' ? 35 : 71, notes: 'Medical desk and women/children support' }
+      ];
+      els.shelterList.innerHTML = shelters.map(s => `<div class="list-item"><div class="strong">${s.name}</div><div class="mini" style="margin-top:6px">Distance ${s.dist} · Capacity ${s.cap} · Free beds ${s.beds}</div><div class="mini">${s.notes}</div><div style="margin-top:8px"><span class="badge">Near ${location.name.split(',')[0]}</span></div></div>`).join('');
+    }
+
+    function renderRoads(model) {
+      const roads = [
+        ['North elevated road', model.status === 'Critical' ? 'Use only for evacuation buses and emergency movement.' : 'Open with caution; avoid stopping near underpasses.'],
+        ['Riverside corridor', model.status === 'Critical' ? 'Avoid. High inundation risk and possible closure.' : 'Moderate waterlogging possible in low sections.'],
+        ['Ring road access', 'Best option for moving toward larger shelter clusters and hospitals.']
+      ];
+      els.roadList.innerHTML = roads.map(r => `<div class="list-item"><div class="strong">${r[0]}</div><div class="mini" style="margin-top:6px">${r[1]}</div></div>`).join('');
+    }
+
+    function renderAlerts(location, model) {
+      const alerts = [
+        { title: 'Official advisory', body: model.status === 'Critical' ? 'Immediate movement to safer ground is advised for low-lying localities.' : model.status === 'Warning' ? 'Prepare for possible escalation in low-lying areas and keep phones charged.' : 'No major flood trigger now, but continue monitoring rain and river conditions.' },
+        { title: 'Community note', body: 'Residents can add map reports by clicking on the map to mark waterlogging, blocked routes, or urgent help points.' },
+        { title: 'Location update', body: `Live dashboard updated for ${location.name.split(',')[0]} at ${model.updatedAt}.` }
+      ];
+      els.alertList.innerHTML = alerts.map(a => `<div class="list-item"><div class="strong">${a.title}</div><div class="mini" style="margin-top:6px">${a.body}</div></div>`).join('');
+    }
+
+    function renderCommunity() {
+      els.communityList.innerHTML = state.community.map(item => {
+        const title = item.kind === 'offer' ? `Offer: ${item.type}` : `Urgent request: ${item.type}`;
+        const meta = item.kind === 'offer' ? `${item.name} · ${item.area} · ${item.contact}` : `${item.name} · ${item.area}`;
+        const extra = item.kind === 'offer' ? 'People nearby can call and coordinate directly.' : escapeHtml(item.notes || 'Needs local support');
+        return `<div class="list-item"><div class="strong">${title}</div><div class="mini" style="margin-top:6px">${meta}</div><div class="mini">${extra}</div><div class="mini">${item.time}</div></div>`;
+      }).join('');
+    }
+
+    function renderChart(model) {
+      const ctx = document.getElementById('trendChart');
+      const labels = model.trendTimes.map(t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const levelData = model.trendRain.map((r, i) => Number((model.waterLevel + r * 0.18 + i * 0.04).toFixed(2)));
+      if (state.chart) state.chart.destroy();
+      state.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Rainfall (mm)', data: model.trendRain, borderColor: '#0b66ff', backgroundColor: 'rgba(11,102,255,.12)', tension: .35, yAxisID: 'y' },
+            { label: 'Water level proxy (m)', data: levelData, borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,.10)', tension: .35, yAxisID: 'y1' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: getComputedStyle(document.body).color } } },
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.body).color }, grid: { color: 'rgba(120,130,150,.12)' } },
+            y: { position: 'left', ticks: { color: getComputedStyle(document.body).color }, grid: { color: 'rgba(120,130,150,.12)' } },
+            y1: { position: 'right', ticks: { color: getComputedStyle(document.body).color }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    function addCitizenReport(lat, lon) {
+      const icon = L.divIcon({ className: '', html: `<div style="width:14px;height:14px;border-radius:50%;background:#dc2626;border:2px solid white;box-shadow:0 0 0 3px rgba(220,38,38,.2)"></div>`, iconSize: [14,14] });
+      L.marker([lat, lon], { icon }).addTo(state.localReportsLayer).bindPopup('Citizen report pin: verify waterlogging or help need locally.');
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>'"]/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[m]));
+    }
+
+    async function updateDashboard(customLocation) {
+      try {
+        setLoading(true);
+        if (customLocation) state.location = customLocation;
+        state.localReportsLayer.clearLayers();
+        const payload = await fetchLiveFloodData(state.location.lat, state.location.lon);
+        const model = deriveRiskModel(payload);
+        state.data = { payload, model };
+        renderMap(state.location, model);
+        renderKPIs(state.location, model);
+        renderSummary(model);
+        renderShelters(state.location, model);
+        renderRoads(model);
+        renderAlerts(state.location, model);
+        renderChart(model);
+      } catch (err) {
+        els.statusPill.className = 'pill crit';
+        els.statusPill.textContent = 'DATA ERROR';
+        els.alertList.innerHTML = `<div class="list-item"><div class="strong">Unable to refresh live data</div><div class="mini" style="margin-top:6px">${escapeHtml(err.message)}. Please retry or search again.</div></div>`;
+      } finally {
+        setLoading(false);
+        renderCommunity();
+      }
+    }
+
+    function setLoading(flag) {
+      els.refreshBtn.classList.toggle('refreshing', flag);
+      els.refreshBtn.disabled = flag;
+      els.searchBtn.disabled = flag;
+      els.statusPill.className = 'pill';
+      els.statusPill.textContent = flag ? 'Refreshing…' : els.statusPill.textContent;
+    }
+
+    async function handleSearch() {
+      const query = els.cityInput.value.trim();
+      if (!query) return;
+      try {
+        const result = await geocodePlace(query);
+        await updateDashboard(result);
+      } catch (err) {
+        els.alertList.innerHTML = `<div class="list-item"><div class="strong">Search failed</div><div class="mini" style="margin-top:6px">${escapeHtml(err.message)}</div></div>`;
+      }
+    }
+
+    function handleTheme() {
+      const root = document.documentElement;
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      if (state.data) renderChart(state.data.model);
+    }
+
+    function bindEvents() {
+      els.searchBtn.addEventListener('click', handleSearch);
+      els.cityInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSearch(); });
+      els.refreshBtn.addEventListener('click', () => updateDashboard());
+      els.themeToggle.addEventListener('click', handleTheme);
+      els.clearIncidentsBtn.addEventListener('click', () => state.localReportsLayer.clearLayers());
+      els.locateBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) return alert('Geolocation is not supported on this device.');
+        navigator.geolocation.getCurrentPosition(async pos => {
+          const custom = { name: 'My current location', lat: pos.coords.latitude, lon: pos.coords.longitude };
+          await updateDashboard(custom);
+        }, () => alert('Unable to access your location.'));
+      });
+
+      document.getElementById('postOfferBtn').addEventListener('click', () => {
+        const name = document.getElementById('offerName').value.trim();
+        const type = document.getElementById('offerType').value;
+        const area = document.getElementById('offerArea').value.trim();
+        const contact = document.getElementById('offerContact').value.trim();
+        if (!name || !area || !contact) return alert('Please fill all offer details.');
+        state.community.unshift({ kind: 'offer', name, type, area, contact, time: 'Just now' });
+        renderCommunity();
+      });
+
+      document.getElementById('postRequestBtn').addEventListener('click', () => {
+        const name = document.getElementById('reqName').value.trim();
+        const type = document.getElementById('reqType').value;
+        const area = document.getElementById('reqArea').value.trim();
+        const notes = document.getElementById('reqNotes').value.trim();
+        if (!name || !area || !notes) return alert('Please fill all request details.');
+        state.community.unshift({ kind: 'request', name, type, area, notes, time: 'Just now' });
+        renderCommunity();
+      });
+    }
+
+    initMap();
+    bindEvents();
+    updateDashboard();
+  </script>
+</body>
+</html>
